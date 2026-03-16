@@ -238,12 +238,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cut, clarity) <span class="sc">|&gt;</span> </span>
 <span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mean_price =</span> <span class="fu">mean</span>(price), </span>
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>            <span class="at">median_carat =</span> <span class="fu">median</span>(carat), </span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">n =</span> <span class="fu">n</span>()) <span class="sc">|&gt;</span> </span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> <span class="dv">1000</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>            <span class="at">n =</span> <span class="fu">n</span>(),</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>            <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> <span class="dv">1000</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 18 × 5
-# Groups:   cut [4]
    cut       clarity mean_price median_carat     n
    &lt;ord&gt;     &lt;ord&gt;        &lt;dbl&gt;        &lt;dbl&gt; &lt;int&gt;
  1 Good      SI2          4580.         1     1081
@@ -272,29 +272,29 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cut, clarity) <span class="sc">|&gt;</span> </span>
 <span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="fu">across</span>(price, mean, <span class="at">.names =</span> <span class="st">"mean_{.col}"</span>),</span>
 <span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>            <span class="fu">across</span>(carat, median, <span class="at">.names =</span> <span class="st">"median_{.col}"</span>),</span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">n =</span> <span class="fu">n</span>()) <span class="sc">|&gt;</span> </span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> <span class="dv">1000</span>) <span class="ot">-&gt;</span> task3_result</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>            <span class="at">n =</span> <span class="fu">n</span>(),</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>            <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(n <span class="sc">&gt;</span> <span class="dv">1000</span>) <span class="ot">-&gt;</span> task3_result</span>
 <span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Четверте завдання</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Візьміть результат попереднього пункту. Перейменуйте стовпець cut на Якість_огранки, а clarity — на Чистота. Перемістіть стовпець n (кількість) між Якість_огранки та Чистота. Перетворіть назви числових стовпців (mean_price, median_carat) на формат з префіксом "Середнє_" та "Медіана_" (наприклад, Середнє_ціна, Медіана_карат).</span></span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a><span class="co"># 💡 Підказка: для перейменування за шаблоном використайте rename_with() з власною функцією або case_when() всередині rename_with().</span></span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>task3_result <span class="sc">|&gt;</span> </span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename_with</span>(<span class="sc">~</span> <span class="fu">case_when</span>(</span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"mean_price"</span> <span class="sc">~</span> <span class="st">"Середнє_ціна"</span>,</span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"median_carat"</span> <span class="sc">~</span> <span class="st">"Медіана_карат"</span>,</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"cut"</span> <span class="sc">~</span> <span class="st">"Якість_огранки"</span>,</span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"clarity"</span> <span class="sc">~</span> <span class="st">"Чистота"</span>,</span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> .x</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span> </span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(n, <span class="at">.after =</span> Якість_огранки)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Четверте завдання</span></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Візьміть результат попереднього пункту. Перейменуйте стовпець cut на Якість_огранки, а clarity — на Чистота. Перемістіть стовпець n (кількість) між Якість_огранки та Чистота. Перетворіть назви числових стовпців (mean_price, median_carat) на формат з префіксом "Середнє_" та "Медіана_" (наприклад, Середнє_ціна, Медіана_карат).</span></span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a><span class="co"># 💡 Підказка: для перейменування за шаблоном використайте rename_with() з власною функцією або case_when() всередині rename_with().</span></span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>task3_result <span class="sc">|&gt;</span> </span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename_with</span>(<span class="sc">~</span> <span class="fu">case_when</span>(</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"mean_price"</span> <span class="sc">~</span> <span class="st">"Середнє_ціна"</span>,</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"median_carat"</span> <span class="sc">~</span> <span class="st">"Медіана_карат"</span>,</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"cut"</span> <span class="sc">~</span> <span class="st">"Якість_огранки"</span>,</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    .x <span class="sc">==</span> <span class="st">"clarity"</span> <span class="sc">~</span> <span class="st">"Чистота"</span>,</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> .x</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">|&gt;</span> </span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(n, <span class="at">.after =</span> Якість_огранки)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 18 × 5
-# Groups:   Якість_огранки [4]
    Якість_огранки     n Чистота Середнє_ціна Медіана_карат
    &lt;ord&gt;          &lt;int&gt; &lt;ord&gt;          &lt;dbl&gt;         &lt;dbl&gt;
  1 Good            1081 SI2            4580.          1   
@@ -331,7 +331,6 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 18 × 5
-# Groups:   Якість_огранки [4]
    Якість_огранки     n Чистота Середнє_price Медіана_carat
    &lt;ord&gt;          &lt;int&gt; &lt;ord&gt;           &lt;dbl&gt;         &lt;dbl&gt;
  1 Good            1081 SI2             4580.          1   

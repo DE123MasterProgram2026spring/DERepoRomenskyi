@@ -92,7 +92,8 @@ diamonds |>
   group_by(cut, clarity) |> 
   summarise(mean_price = mean(price), 
             median_carat = median(carat), 
-            n = n()) |> 
+            n = n(),
+            .groups = "drop") |> 
   filter(n > 1000)
 
 # Варіант з across()
@@ -100,7 +101,8 @@ diamonds |>
   group_by(cut, clarity) |> 
   summarise(across(price, mean, .names = "mean_{.col}"),
             across(carat, median, .names = "median_{.col}"),
-            n = n()) |> 
+            n = n(),
+            .groups = "drop") |> 
   filter(n > 1000) -> task3_result
 
 
