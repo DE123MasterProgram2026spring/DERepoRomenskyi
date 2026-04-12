@@ -1,0 +1,225 @@
+---
+title: "Лабораторна робота №3:Робота зі структурованими даними, перетворення форматів та віконні операції"
+subtitle: "Інженерія даних | КрНУ ім. М. Остроградського"
+author: "Роменський В'ячеслав"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    sidebar: left
+    collapse-level: 2
+    code-fold: true
+    code-overflow: wrap
+    page-layout: full
+#     include-in-footer:
+#       text: |
+#         <hr>
+#         <footer style="text-align: center; font-size: 0.9em; color: #666;">
+#           <p>Виконав(ла): <strong>Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В.М.</p>
+#           <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+#         </footer>
+# editor: visual
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Мета роботи
+
+Освоїти сучасні методи обробки неструктурованих та напівструктурованих даних (JSON), навчитися перетворювати формати таблиць (широкий ↔ довгий) за допомогою tidyr, а також застосовувати віконні функції для аналізу даних у контексті груп (наприклад, часових рядів, відділів, регіонів). Ці навички є ключовими для підготовки даних у складних ETL-процесах.
+
+## Варіант 2
+
+Відсутні датасети заданої структури згенерувати самостійно.
+
+### Тема: Аналіз даних про веб-трафік та маркетингові кампанії
+
+Ви отримали дані про відвідуваність веб-сайту та маркетингові активності компанії за перший квартал 2024 року. Ваше завдання -- побудувати ETL-конвеєр для аналізу ефективності кампаній.
+
+### Джерела даних
+
+1.  `traffic.json` -- JSON-файл з щоденними метриками відвідуваності:
+
+    ``` json
+    {
+      "date": "2024-01-01",
+      "page_views": 1250,
+      "unique_users": 840,
+      "bounce_rate": 0.42,
+      "campaigns": [
+        {"name": "google_ads", "channel": "paid_search", "cost": 120},
+        {"name": "email_jan", "channel": "email", "cost": 50}
+      ]
+    }
+    ```
+
+    > [Файл](data/ga_nowember.csv) (приклад структури -- ви можете створити власний або використати імітацію)
+
+2.  `monthly_reports.xlsx` -- Excel-файл з аркушами:
+
+    -   `jan`, `feb`, `mar` -- стовпці: `page`, `sessions`, `avg_duration_sec`\
+
+3.  `goals.csv` -- цільові показники на квартал:\
+    `metric`, `target_value` (наприклад: `total_users`, `25000`)
+
+### Завдання
+
+#### Етап 1: Робота з JSON
+
+-   Завантажте `traffic.json` за допомогою `jsonlite::read_json()`.
+-   Перетворіть у `tibble`.
+-   Використовуючи `hoist()` та `unnest_longer()`, виділіть:
+    -   `date`, `page_views`, `unique_users`, `bounce_rate`
+    -   для кожної кампанії -- `campaign_name`, `channel`, `cost`
+-   Залиште лише записи, де *вартість кампанії \> 0*.
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(jsonlite)
+
+traffic_json <- read_json("data/traffic.json")
+
+traffic_json <- tibble(traffic = traffic_json)
+traffic_json
+
+traffic_json |>
+  hoist(traffic,
+        date = "date",
+        page_views = "page_views",
+        unique_users = "unique_users",
+        bounce_rate = "bounce_rate",
+        campaigns = "campaigns")
+
+traffic_json |>
+  unnest_longer(traffic) |>
+  filter(traffic_id == "campaigns") |>
+  select(-traffic_id) |>
+  unnest_longer(traffic) |>
+  hoist(traffic,
+        name = "name",
+        channel = "channel",
+        cost = "cost") |>
+  filter(cost > 0)
+```
+
+#### Етап 2: Перетворення форматів
+
+-   Завантажте всі аркуші з `monthly_reports.xlsx`.
+-   Використовуйте `fill(region, .direction = "down")`, якщо є об’єднані комірки (імітуйте структуру з прикладу).
+-   Об’єднайте аркуші у єдину таблицю `monthly_traffic`, додавши стовпець `month` (`"2024-01"`, `"2024-02"`, `"2024-03"`).
+-   Перетворіть таблицю з «широкого» у «довгий» формат за допомогою `pivot_longer()` (якщо потрібно).
+-   Завантажте `goals.csv` через `vroom()`.
+
+```{r}
+library(readxl)
+
+jan <- read_excel("data/monthly_reports.xlsx", sheet = "jan")
+feb <- read_excel("data/monthly_reports.xlsx", sheet = "feb")
+mar <- read_excel("data/monthly_reports.xlsx", sheet = "mar")
+
+monthly_traffic <- bind_rows(jan |> mutate(month = "2024-01"),
+                             feb |> mutate(month = "2024-02"),
+                             mar |> mutate(month = "2024-03"))
+monthly_traffic
+
+library(vroom)
+
+goals <- vroom(file = "data/goals.csv")
+goals
+```
+
+#### Етап 3: Об’єднання та віконні операції
+
+-   Об’єднайте дані з JSON (`daily_metrics`) і `monthly_traffic` за `month` (попередньо перетворіть `date` → `month`).
+-   Розрахуйте *конверсію*: `conversion = unique_users / page_views`.
+-   Для кожного місяця виконайте:
+    -   *Ранжування*: визначте кампанію з *найвищою ROI* (`(unique_users * 0.1 - cost) / cost`).
+    -   *Зсув*: розрахуйте *зміну bounce rate відносно попереднього місяця* (`bounce_change = bounce_rate - lag(bounce_rate)`).
+    -   *Накопичення*: обчисліть *накопичену кількість унікальних користувачів* (`cum_users = cumsum(unique_users)`).
+
+```{r}
+traffic_updated <- traffic_json |>
+  unnest_wider(traffic) |>
+  unnest_longer(campaigns) |>
+  unnest_wider(campaigns) |>
+  mutate(month = substr(date, 1, nchar(date) - 3)) |>
+  select(-date) |>
+  group_by(month) |>
+  summarise(page_views = sum(page_views), 
+            unique_users = sum(unique_users),
+            bounce_rate = mean(bounce_rate),
+            cost = sum(cost),
+            .groups = "drop")
+
+traffic_updated
+
+monthly_traffic_updated <- traffic_updated |>
+  left_join(monthly_traffic |> 
+              group_by(month) |>
+              summarise(sessions = sum(sessions),
+                        avg_duration_sec = mean(avg_duration_sec)), 
+            by = "month") |>
+  mutate(conversion = unique_users / page_views)
+  
+monthly_traffic_updated
+
+monthly_traffic_stats <- monthly_traffic_updated |>
+  mutate(roi = (unique_users * 0.1 - cost) / cost) |>
+  mutate(bounce_change = bounce_rate - lag(bounce_rate)) |>
+  mutate(cum_users = cumsum(unique_users))
+  
+monthly_traffic_stats
+```
+
+#### Етап 4: Аналіз
+
+-   Визначте, чи досягнуто цільових показників (порівняйте `cum_users` з `goals`).
+-   Використайте `semi_join()`, щоб знайти місяці, коли *всі кампанії мали ROI \> 0*.
+-   Використайте `anti_join()`, щоб знайти місяці, коли *були витрати, але bounce rate зріс*.
+
+```{r}
+goal_users_val <- goals |>
+  filter(metric == "total_users") |>
+  pull(target_value)
+
+goal_conversion_val <- goals |>
+  filter(metric == "conversion_rate") |>
+  pull(target_value)
+
+goal_pageviews_val <- goals |>
+  filter(metric == "page_views") |>
+  pull(target_value)
+
+goal_duration_val <- goals |>
+  filter(metric == "avg_session_duration") |>
+  pull(target_value)
+
+monthly_traffic_stats |>
+  mutate(goal_pageviews = page_views >= goal_pageviews_val) |>
+  mutate(goal_conversion = conversion >= goal_conversion_val) |>
+  mutate(goal_users = unique_users >= goal_users_val) |>
+  mutate(goal_duration = avg_duration_sec >= goal_duration_val) |>
+  select(month,goal_conversion,goal_pageviews,goal_users,goal_duration)
+```
+
+### Технічні вимоги
+
+-   Використовуйте *конвеєрний синтаксис* (`%>%`).
+-   Для роботи з JSON -- `hoist()`, `unnest_longer()`.
+-   Для перетворення форматів -- `pivot_longer()`, `fill()`, `separate()` (якщо потрібно).
+-   Для віконних операцій -- `group_by()`, `mutate()`, `lag()`, `cumsum()`, `dense_rank()`.
+-   Усі файли завантажуються з папки `data/`.
+
+```{=html}
+<hr style="border: 1px solid #ddd; margin: 30px 0 10px 0;">
+<footer style="text-align: center; font-size: 0.9em; color: #666; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; margin-top: 20px;">
+  <p><strong>Виконав(ла): Роменський В.О.</strong> | Група: <strong>КН-21-1м</strong> | Викладач: Сидоренко В.М.</p>
+  <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+</footer>
+```

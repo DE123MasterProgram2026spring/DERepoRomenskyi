@@ -1,0 +1,6 @@
+metric,target_value
+total_users,12000.0
+page_views,15000.0
+conversion_rate,0.03
+avg_session_duration,180.0
+

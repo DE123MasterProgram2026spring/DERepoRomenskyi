@@ -1,0 +1,167 @@
+[
+  {
+    "date": "2024-01-01",
+    "page_views": 1125,
+    "unique_users": 1006,
+    "bounce_rate": 0.31,
+    "campaigns": [
+      {
+        "name": "direct",
+        "channel": "organic",
+        "cost": 93
+      },
+      {
+        "name": "direct",
+        "channel": "organic",
+        "cost": 64
+      }
+    ]
+  },
+  {
+    "date": "2024-01-02",
+    "page_views": 4293,
+    "unique_users": 3090,
+    "bounce_rate": 0.44,
+    "campaigns": [
+      {
+        "name": "newsletter",
+        "channel": "email",
+        "cost": 71
+      },
+      {
+        "name": "google_ads",
+        "channel": "paid_search",
+        "cost": 74
+      }
+    ]
+  },
+  {
+    "date": "2024-01-03",
+    "page_views": 4301,
+    "unique_users": 3093,
+    "bounce_rate": 0.3,
+    "campaigns": [
+      {
+        "name": "newsletter",
+        "channel": "email",
+        "cost": 192
+      },
+      {
+        "name": "newsletter",
+        "channel": "email",
+        "cost": 211
+      }
+    ]
+  },
+  {
+    "date": "2024-02-04",
+    "page_views": 4679,
+    "unique_users": 4188,
+    "bounce_rate": 0.49,
+    "campaigns": [
+      {
+        "name": "newsletter",
+        "channel": "email",
+        "cost": 153
+      }
+    ]
+  },
+  {
+    "date": "2024-02-05",
+    "page_views": 4264,
+    "unique_users": 2633,
+    "bounce_rate": 0.57,
+    "campaigns": [
+      {
+        "name": "newsletter",
+        "channel": "email",
+        "cost": 262
+      }
+    ]
+  },
+  {
+    "date": "2024-02-06",
+    "page_views": 3562,
+    "unique_users": 2952,
+    "bounce_rate": 0.53,
+    "campaigns": [
+      {
+        "name": "seo_blog",
+        "channel": "organic",
+        "cost": 37
+      }
+    ]
+  },
+  {
+    "date": "2024-03-07",
+    "page_views": 1338,
+    "unique_users": 1180,
+    "bounce_rate": 0.6,
+    "campaigns": [
+      {
+        "name": "instagram_promo",
+        "channel": "social",
+        "cost": 55
+      },
+      {
+        "name": "bing_ads",
+        "channel": "paid_search",
+        "cost": 180
+      },
+      {
+        "name": "seo_blog",
+        "channel": "organic",
+        "cost": 283
+      }
+    ]
+  },
+  {
+    "date": "2024-03-08",
+    "page_views": 1486,
+    "unique_users": 857,
+    "bounce_rate": 0.52,
+    "campaigns": [
+      {
+        "name": "instagram_promo",
+        "channel": "social",
+        "cost": 222
+      }
+    ]
+  },
+  {
+    "date": "2024-03-09",
+    "page_views": 3144,
+    "unique_users": 1934,
+    "bounce_rate": 0.63,
+    "campaigns": [
+      {
+        "name": "instagram_promo",
+        "channel": "social",
+        "cost": 161
+      },
+      {
+        "name": "instagram_promo",
+        "channel": "social",
+        "cost": 198
+      }
+    ]
+  },
+  {
+    "date": "2024-03-10",
+    "page_views": 2373,
+    "unique_users": 1512,
+    "bounce_rate": 0.63,
+    "campaigns": [
+      {
+        "name": "seo_blog",
+        "channel": "organic",
+        "cost": 215
+      },
+      {
+        "name": "instagram_promo",
+        "channel": "social",
+        "cost": 113
+      }
+    ]
+  }
+]
