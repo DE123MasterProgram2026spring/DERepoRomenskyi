@@ -1,0 +1,195 @@
+---
+title: "Лабораторна робота №2: Інтеграція та об’єднання даних з різних джерел"
+subtitle: "Інженерія даних | КрНУ ім. М. Остроградського"
+author: "Роменський В'ячеслав"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    sidebar: left
+    collapse-level: 2
+    code-fold: true
+    code-overflow: wrap
+    page-layout: full
+#     include-in-footer:
+#       text: |
+#         <hr>
+#         <footer style="text-align: center; font-size: 0.9em; color: #666;">
+#           <p>Виконав(ла): <strong>Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В.М.</p>
+#           <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2026</p>
+#         </footer>
+# editor: visual
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+### Мета роботи
+
+Освоїти повний цикл інтеграції реляційних даних у середовищі R: від завантаження даних з різноманітних джерел (CSV, Excel, Google Таблиці) до їх об’єднання за допомогою вертикальних (`bind_rows`) та горизонтальних (`left_join`, `semi_join`, `anti_join`) операцій. Навчитися будувати реалістичні ETL-конвеєри, які моделюють типові задачі інженера даних у production-середовищі.
+
+### Варіант 2
+
+Датасети згенерувати самостійно.
+
+### Тема: Аналіз студентських оцінок за два семестри
+
+Ви отримали два Excel-файли з навчальними даними:
+
+-   `semester1.xlsx` -- містить аркуші:
+    -   `students` -- довідник студентів (`student_id`, `full_name`, `group`, `faculty`)\
+    -   `grades_math`, `grades_physics`, `grades_cs` -- оцінки з окремих дисциплін (`student_id`, `exam_score`, `project_score`)
+-   `semester2.xlsx` -- аналогічна структура для другого семестру.
+
+Крім того, є файл `scholarships.csv`, який містить інформацію про стипендії:\
+`student_id`, `scholarship_type` («academic», «social»), `amount`.
+
+### Завдання:
+
+1.  **Завантаження даних**
+    -   Завантажте обидва Excel-файли, прочитайте всі аркуші з оцінками.\
+    -   Завантажте `scholarships.csv` за допомогою `vroom`.
+    
+```{r}
+library(vroom)
+library(readxl)
+library(dplyr)
+
+getwd()
+ga1_data <- vroom(file = "data/scholarships1.csv")
+ga2_data <- vroom(file = "data/scholarships2.csv")
+
+excel_sheets("data/semester1.xlsx")
+excel_sheets("data/semester2.xlsx")
+
+x1_students <- read_excel("data/semester1.xlsx", sheet = "students")
+x1_math <- read_excel("data/semester1.xlsx", sheet = "grades_math")
+x1_physics <- read_excel("data/semester1.xlsx", sheet = "grades_physics")
+x1_cs <- read_excel("data/semester1.xlsx", sheet = "grades_cs")
+
+x2_students <- read_excel("data/semester2.xlsx", sheet = "students")
+x2_math <- read_excel("data/semester2.xlsx", sheet = "grades_math")
+x2_physics <- read_excel("data/semester2.xlsx", sheet = "grades_physics")
+x2_cs <- read_excel("data/semester2.xlsx", sheet = "grades_cs")
+```
+    
+2.  **Вертикальне об’єднання**
+    -   Об’єднайте всі таблиці оцінок за **перший семестр** у єдину таблицю `grades_s1`, додавши стовпець `semester = "S1"` та `subject` (назва дисципліни).\
+    
+```{r}
+x1_math_s <- x1_math %>% mutate(subject = "Math")
+x1_physics_s <- x1_physics %>% mutate(subject = "Physics")
+x1_cs_s <- x1_cs %>% mutate(subject = "Computes Science")
+grades_s1 <- bind_rows(x1_math_s, x1_physics_s, x1_cs_s) %>% mutate(semester = "S1")
+
+grades_s1
+```
+    
+    -   Аналогічно створіть `grades_s2` для другого семестру.\
+    
+```{r}
+x2_math_s <- x2_math %>% mutate(subject = "Math")
+x2_physics_s <- x2_physics %>% mutate(subject = "Physics")
+x2_cs_s <- x2_cs %>% mutate(subject = "Computes Science")
+grades_s2 <- bind_rows(x2_math_s, x2_physics_s, x2_cs_s) %>% mutate(semester = "S2")
+
+grades_s2
+```
+    
+    -   Об’єднайте `grades_s1` і `grades_s2` у `all_grades`.
+    
+```{r}
+all_grades <- bind_rows(grades_s1, grades_s2)
+
+all_grades
+```
+
+3.  **Горизонтальне об’єднання**
+    -   Додайте до `all_grades` інформацію про студентів (`full_name`, `group`, `faculty`) через `left_join`.\
+    
+```{r}
+grades_s1_full <- grades_s1 %>% left_join(x1_students,
+                         by = c("student_id" = "student_id"))
+grades_s2_full <- grades_s2 %>% left_join(x2_students,
+                         by = c("student_id" = "student_id"))
+all_grades_full <- bind_rows(grades_s1_full, grades_s2_full)
+
+all_grades_full
+```
+    
+    -   Додайте інформацію про стипендії (`scholarship_type`, `amount`) через `left_join`.
+    
+```{r}
+ga1_data_updated <- ga1_data %>% mutate(semester = "S1")
+ga1_data_updated
+
+ga2_data_updated <- ga2_data %>% mutate(semester = "S2")
+ga2_data_updated
+
+all_grades_updated <- all_grades_full %>% left_join(bind_rows(ga1_data_updated, ga2_data_updated),
+                              by = c("student_id" = "student_id", "semester" = "semester"))
+all_grades_updated
+```
+    
+4.  **Агрегація та аналіз**
+    -   Розрахуйте загальний бал за дисципліну: `total_score = 0.6 * exam_score + 0.4 * project_score`.\
+    
+```{r}
+all_grades_updated %>% 
+  mutate(total_score = 0.6 * exam_score + 0.4 * project_score) %>%
+  arrange(desc(total_score))
+```
+    
+    -   Для кожної групи та семестру обчисліть:
+        -   середній загальний бал,\
+        -   кількість студентів з балом ≥ 90,\
+        -   частку студентів зі стипендією.
+        
+```{r}
+all_grades_updated %>% 
+  mutate(total_score = 0.6 * exam_score + 0.4 * project_score) %>%
+  group_by(semester, group) %>%
+  summarise(mean_score = mean(total_score), 
+            high_achievers = sum(total_score >= 90),
+            scholarships = mean(!is.na(scholarship_type)),
+            .groups = "drop")
+```
+        
+5.  **Фільтруюче з’єднання**
+    -   Визначте `student_id`, які отримували стипендію *в обох семестрах* (використайте `semi_join` двічі).\
+    -   Визначте студентів, які *втратили стипендію* після першого семестру -- були в `scholarships` і в `S1`, але відсутні в `S2` (використайте `anti_join`).
+    
+```{r}
+s1 <- x1_students %>% 
+  semi_join(ga1_data, by = "student_id")
+s1
+
+s2 <- x2_students %>% 
+  semi_join(ga2_data, by = "student_id")
+s2
+
+both_semesters <- s1 %>%
+  semi_join(s2, by = "student_id")
+both_semesters
+```
+
+### Технічні вимоги:
+
+-   Використовуйте *конвеєрний синтаксис* (`%>%` або `|>`).
+-   Для вертикального об’єднання використовуйте `bind_rows()` з аргументом `.id` або `mutate()` для додавання метаданих (`semester`, `subject`).
+-   Уникайте дублювання коду -- використовуйте функції або повторювані патерни через `map()` (якщо знайомі) або чітку структуру.
+-   Усі файли мають завантажуватися з папки `data/` -- забезпечте відтворюваність.
+
+
+```{=html}
+<hr style="border: 1px solid #ddd; margin: 30px 0 10px 0;">
+<footer style="text-align: center; font-size: 0.9em; color: #666; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; margin-top: 20px;">
+  <p><strong>Виконав(ла): Роменський В.О</strong> | Група: <strong>КН-25-1м</strong> | Викладач: Сидоренко В.М.</p>
+  <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2026</p>
+</footer>
+```
