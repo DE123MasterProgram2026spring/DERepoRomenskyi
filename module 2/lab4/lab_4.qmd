@@ -1,0 +1,297 @@
+---
+title: "Лабораторна робота №4: Оптимізація коду в R — від циклів до функціонального програмування"
+subtitle: "Інженерія даних | КрНУ ім. М. Остроградського"
+author: "Роменський В'ячеслав"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    sidebar: left
+    collapse-level: 2
+    code-fold: true
+    code-overflow: wrap
+    page-layout: full
+#     include-in-footer:
+#       text: |
+#         <hr>
+#         <footer style="text-align: center; font-size: 0.9em; color: #666;">
+#           <p>Виконав(ла): <strong>Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В.М.</p>
+#           <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+#         </footer>
+# editor: visual
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Мета роботи
+
+Освоїти сучасні підходи до оптимізації коду в R, зокрема:\
+- заміну імпераивних циклів (`for`, `while`, `repeat`) на *функціонали* (`lapply`, `sapply`, `vapply`, `mapply`);\
+- використання *векторизованих операцій* (`rowSums`, `colMeans`, `apply`);\
+- застосування конструкцій обробки помилок (`try`, `tryCatch`) для стійкості конвеєрів.\
+Навчитися писати *ефективний, читабельний і масштабований код* у рамках функціональної парадигми програмування.
+
+## Варіант 1
+
+### Тема: Аналіз якості даних у папці з щомісячними звітами
+
+Ви отримали папку `monthly_reports/`, яка містить *12 CSV-файлів* (`jan.csv`, `feb.csv`, ..., `dec.csv`) зі звітами про продажі. Однак деякі файли можуть бути:\
+- пошкодженими (неправильний формат, відсутні стовпці),\
+- порожніми,\
+- містити некоректні значення (негативні ціни, `NA` у ключових полях).
+
+Ваше завдання -- побудувати *надійний, оптимізований ETL-конвеєр* у функціональному стилі.
+
+### Структура даних
+
+Кожен файл має стовпці:\
+`product_id`, `region`, `units_sold`, `price_per_unit`, `discount_percent`
+
+### Завдання
+
+### Етап 1: Безпечне завантаження файлів
+
+-   Створіть функцію `safe_read_report(path)`, яка:
+    -   використовує `tryCatch()` для перехоплення помилок при читанні;
+    -   у разі помилки -- виводить повідомлення через `message()` і повертає *порожній tibble* з правильними стовпцями;
+    -   перевіряє наявність усіх 5 стовпців; якщо чогось не вистачає -- повертає порожній tibble.
+-   Використовуйте `list.files()` + `lapply()` (або `map()`) для завантаження всіх файлів.
+-   Об’єднайте результат у єдину таблицю `all_sales`.
+
+```{r}
+library(tidyverse)
+
+# Правильна структура порожнього tibble
+empty_sales_tbl <- tibble(
+  product_id = character(),
+  region = character(),
+  units_sold = numeric(),
+  price_per_unit = numeric(),
+  discount_percent = numeric()
+)
+
+safe_read_report <- function(path) {
+  required_cols <- c(
+    "product_id",
+    "region",
+    "units_sold",
+    "price_per_unit",
+    "discount_percent"
+  )
+  tryCatch({
+    df <- read.csv(path)
+
+    # Перевірка на порожній файл
+    if (nrow(df) == 0) {
+      message("Empty file: ", path)
+      return(empty_sales_tbl)
+    }
+
+    # Перевірка наявності всіх стовпців
+    missing_cols <- setdiff(required_cols, names(df))
+
+    # Якщо є різниця між колонками, то помилка
+    if (length(missing_cols) > 0) {
+      message(
+        "Missing columns in ",
+        path,
+        ": ",
+        paste(missing_cols, collapse = ", ")
+      )
+
+      return(empty_sales_tbl)
+    }
+
+    # Повертаємо tibble
+    as_tibble(df)
+
+  }, error = function(e) {
+    message("Error reading file: ", path)
+    empty_sales_tbl
+  })
+}
+
+# Завантаження всіх файлів
+file_paths <- list.files("data/monthly_reports", pattern = "\\.csv$", full.names = TRUE)
+sales_list <- lapply(file_paths, safe_read_report)
+all_data <- sales_list %>% bind_rows()
+
+all_data
+```
+
+### Етап 2: Оптимізована обробка даних
+
+-   Додайте стовпець `month` на основі імені файлу (наприклад, `"jan"` → `"2024-01"`).
+-   Розрахуйте `revenue = units_sold * price_per_unit * (1 - discount_percent / 100)`.
+-   Використовуйте *векторизовані операції*, а не цикли.
+-   Для кожного місяця обчисліть:
+    -   загальний дохід (`total_revenue`),
+    -   середню ціну (`avg_price`),
+    -   кількість унікальних продуктів (`n_products`).
+
+> 💡 Використовуйте `group_by()` + `summarise()` — не `for`!
+
+```{r}
+sales_with_month <- Map(function(df, path) {
+  # Отримання назви місяця з файлу
+  month_name <- tools::file_path_sans_ext(basename(path))
+
+  # Мапінг month -> YYYY-MM
+  month_map <- c(
+    jan = "2026-01",
+    feb = "2026-02",
+    mar = "2026-03",
+    apr = "2026-04",
+    may = "2026-05",
+    jun = "2026-06",
+    jul = "2026-07",
+    aug = "2026-08",
+    sep = "2026-09",
+    oct = "2026-10",
+    nov = "2026-11",
+    dec = "2026-12"
+  )
+
+  df %>% mutate(month = month_map[[month_name]])
+}, sales_list, file_paths)
+
+all_data_with_month <- sales_with_month %>% bind_rows() %>% arrange(month)
+
+all_data_with_month
+```
+
+```{r}
+all_data_with_month <- all_data_with_month %>%
+  mutate(
+    revenue = units_sold *
+      price_per_unit *
+      (1 - discount_percent / 100)
+  )
+
+all_data_with_month
+```
+
+```{r}
+monthly_summary <- all_data_with_month %>%
+  group_by(month) %>%
+  summarise(
+    total_revenue = sum(revenue, na.rm = TRUE),
+    avg_price = mean(price_per_unit, na.rm = TRUE),
+    n_products = n_distinct(product_id),
+    .groups = "drop"
+  )
+
+monthly_summary
+```
+
+### Етап 3: Аналіз якості даних
+
+-   Визначте, *скільки файлів було пошкоджено* (порівняйте очікувану кількість файлів із реально завантаженими).
+-   Для кожного місяця обчисліть *частку рядків з `NA`* у будь-якому стовпці.
+-   Використовуйте `colSums(is.na(...))` -- не цикли!
+
+```{r}
+expected_files <- length(file_paths)
+
+loaded_files <- nrow(monthly_summary)
+
+corrupted_files <- expected_files - loaded_files
+
+message("Corrupted or invalid files: ", corrupted_files)
+
+sales_quality <- all_data_with_month %>%
+  mutate(
+    has_na = if_any(everything(), is.na)
+  )
+
+# Аналіз по місяцях
+monthly_na_summary <- sales_quality %>%
+  group_by(month) %>%
+  summarise(
+    total_rows = n(),
+    rows_with_na = sum(has_na),
+    na_share = rows_with_na / total_rows,
+    total_na = sum(rowSums(is.na(across(everything())))),
+    .groups = "drop"
+  )
+
+monthly_na_summary
+```
+
+#### Етап 4: Порівняння підходів (на прикладі)
+
+-   Напишіть *один і той самий розрахунок* двома способами:
+    1.  За допомогою `for`-циклу (для демонстрації).
+    2.  За допомогою `vapply()` або `sapply()`.
+-   Порівняйте швидкість за допомогою `system.time()` (не обов’язково в звіті, але для розуміння).
+
+```{r}
+system.time({
+months <- unique(all_data_with_month$month)
+
+result_for <- data.frame()
+
+for (m in months) {
+  temp <- all_data_with_month[all_data_with_month$month == m, ]
+  
+  total_rows <- nrow(temp)
+  rows_with_na <- sum(!complete.cases(temp))
+  
+  total_na <- sum(is.na(temp))
+  
+  result_for <- rbind(result_for, data.frame(
+    month = m,
+    total_rows = total_rows,
+    rows_with_na = rows_with_na,
+    na_share = rows_with_na / total_rows,
+    total_na = total_na
+  ))
+}
+})
+```
+
+```{r}
+system.time({
+months <- unique(all_data_with_month$month)
+
+result_vapply <- data.frame(
+  month = months,
+  total_rows = vapply(months, function(m) {
+    sum(all_data_with_month$month == m)
+  }, numeric(1)),
+  
+  rows_with_na = vapply(months, function(m) {
+    temp <- all_data_with_month[all_data_with_month$month == m, ]
+    sum(!complete.cases(temp))
+  }, numeric(1)),
+  
+  total_na = vapply(months, function(m) {
+    temp <- all_data_with_month[all_data_with_month$month == m, ]
+    sum(is.na(temp))
+  }, numeric(1))
+)
+
+result_vapply$na_share <- result_vapply$rows_with_na / result_vapply$total_rows
+})
+```
+
+### Технічні вимоги
+
+-   Увесь код має бути написаний у *функціональному стилі*.
+-   *Заборонено використовувати `for`, `while`, `repeat`* у основному рішенні (лише для порівняння в Етапі 4).
+-   Усі файли завантажуються з папки `data/monthly_reports/`.
+-   Конвеєр має бути *відтворюваним* і *стійким до помилок*.
+
+```{=html}
+<hr style="border: 1px solid #ddd; margin: 30px 0 10px 0;">
+<footer style="text-align: center; font-size: 0.9em; color: #666; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; margin-top: 20px;">
+  <p><strong>Виконав(ла): Роменський В'ячеслав Олегович</strong> | Група: <strong>КН-25-1м</strong> | Викладач: Сидоренко В.М.</p>
+  <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+</footer>
+```
