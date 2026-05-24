@@ -1,0 +1,4 @@
+...1,product_id,name,price,date,manager,clients,count,sale_sum,transaction_id
+1,4,PC,1500,2024-09-23,Ivan,client 20,2,3000,7
+3,2,Smarthphone,850,2024-09-23,Ivan,client 20,2,1700,7
+4,5,Playstation,1000,2024-09-23,Ivan,client 20,3,3000,7

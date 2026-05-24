@@ -1,0 +1,209 @@
+---
+title: "Лабораторна робота №5: Функціональне програмування та паралельні обчислення в R"
+subtitle: "Інженерія даних | КрНУ ім. М. Остроградського"
+author: "Роменський В'ячеслав"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    sidebar: left
+    collapse-level: 2
+    code-fold: true
+    code-overflow: wrap
+    page-layout: full
+#     include-in-footer:
+#       text: |
+#         <hr>
+#         <footer style="text-align: center; font-size: 0.9em; color: #666;">
+#           <p>Виконав(ла): <strong>Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В.М.</p>
+#           <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+#         </footer>
+# editor: visual
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Мета роботи
+
+Освоїти сучасні підходи до *функціонального програмування* за допомогою пакета `purrr` та навчитися *масштабувати обчислення* через *багатопоточність* (`foreach`, `furrr`, `future`). Навчитися будувати *ефективні, читабельні та масштабовані конвеєри обробки даних*, які можуть працювати з великими обсягами інформації або довготривалими операціями.
+
+## Варіант 1
+
+### Тема: Масштабований аналіз транзакційних даних
+
+Ви отримали *7 файлів* (`transaction_1.csv` -- `transaction_7.csv`), кожен з яких містить дані про одну транзакцію (як у прикладі). Однак у реальному сценарії таких файлів може бути *тисячі*, і обробка їх послідовно займе неприйнятно багато часу.
+
+Ваше завдання -- побудувати *масштабований, надійний та оптимізований ETL-конвеєр*, який:
+
+1.  Безпечно завантажує всі файли (навіть якщо деякі пошкоджені)
+2.  Агрегує дані
+3.  Виконує аналіз
+4.  Зберігає результати -- *все це з використанням функціонального програмування та паралельних обчислень*.
+
+### Завдання
+
+```{r}
+library(tidyverse)
+library(purrr)
+library(furrr)
+library(foreach)
+library(doParallel)
+library(future)
+```
+
+#### **Етап 1: Функціональне завантаження та фільтрація (purrr)**
+
+-   Створіть функцію `safe_read_transaction(path)`, яка використовує `tryCatch()` для безпечного читання CSV.
+-   Використовуйте `list.files()` + `map()` для завантаження всіх файлів.
+-   Відфільтруйте транзакції з *загальною сумою (`sale_sum`) ≥ 1000* за допомогою `keep()`.
+
+```{r}
+safe_read_transaction <- function(path) {
+  tryCatch(
+    {
+      read_csv(path, show_col_types = FALSE)
+    },
+    error = function(e) {
+      message(paste("Помилка у файлі:", path))
+      return(NULL)
+    }
+  )
+}
+
+# Завантаження всіх файлів
+files <- list.files("data/transactions", pattern = "\\.csv$", full.names = TRUE)
+data_list <- lapply(files, safe_read_transaction)
+data_list <- compact(data_list)
+
+high_value_list <- map(data_list, ~ filter(.x, sale_sum >= 1000))
+high_value_list
+```
+
+#### **Етап 2: Послідовна агрегація (reduce)**
+
+-   Об’єднайте всі транзакції в єдину таблицю за допомогою `reduce(bind_rows)`.
+-   Додайте стовпець `file_id` на основі імені файлу.
+
+```{r}
+all_transactions <- reduce(data_list, bind_rows)
+
+# додаємо file_id з імені файлу
+all_transactions <- all_transactions %>%
+  mutate(file_id = rep(seq_along(data_list), map_int(data_list, nrow)))
+
+all_transactions
+```
+
+#### **Етап 3: Паралельний аналіз (foreach + furrr)**
+
+-   Напишіть функцію `analyze_manager(df)`, яка для кожного менеджера рахує:
+    -   кількість транзакцій,
+    -   загальну суму продажів,
+    -   середній чек.
+-   Виконайте цей аналіз *двома способами*:
+    1.  За допомогою `foreach(..., .combine = bind_rows) %dopar%`.
+    2.  За допомогою `future_map_dfr()` з `furrr`.
+    
+```{r}
+analyze_manager <- function(df) {
+  df %>%
+    group_by(manager) %>%
+    summarise(
+      transactions = n(),
+      total_sales = sum(sale_sum, na.rm = TRUE),
+      avg_check = mean(sale_sum, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+# === Foreach ===
+cl <- makeCluster(detectCores() - 1)
+registerDoParallel(cl)
+
+manager_foreach <- foreach(
+  df = data_list,
+  .combine = bind_rows,
+  .packages = c("dplyr")
+) %dopar% {
+
+  analyze_manager(df)
+}
+
+stopCluster(cl)
+
+# === PURRR ===
+plan(multisession)
+
+manager_furrr <- future_map_dfr(
+  data_list,
+  analyze_manager
+)
+
+manager_furrr
+```
+
+#### **Етап 4: Просунута багатопоточність (future)**
+
+-   Створіть *вкладені ф'ючерси*:
+    -   Зовнішній ф'ючерс -- для кожного файлу.
+    -   Внутрішній ф'ючерс -- для обробки кожного рядка (наприклад, валідація ціни).
+-   Використовуйте `plan(list(multisession, multisession))`.
+-   Додайте обробку помилок через `resolved()` та `backtrace()`.
+
+```{r}
+plan(list(multisession, multisession))
+
+process_file <- function(df) {
+
+  future_map_dfr(seq_len(nrow(df)), function(i) {
+
+    row <- df[i, ]
+
+    valid_price <- !is.na(row$price) && row$price > 0
+
+    tibble(
+      product_id = row$product_id,
+      valid = valid_price,
+      sale_sum = row$sale_sum
+    )
+  })
+}
+
+nested_results <- future_map_dfr(data_list, process_file)
+
+nested_results
+```
+
+#### **Етап 5: Збереження результатів**
+
+-   Збережіть відфільтровані транзакції у файли за допомогою `walk2()` (наприклад, `high_value_1.csv`, `high_value_2.csv`, ...).
+
+```{r}
+walk2(
+  high_value_list,
+  seq_along(high_value_list),
+  ~ write_csv(.x, paste0("high_value_", .y, ".csv"))
+)
+```
+
+### Технічні вимоги
+
+-   Увесь код має бути написаний у *функціональному стилі*.
+-   Використовуйте *лише* `purrr`, `foreach`, `furrr`, `future` -- *без циклів `for`/`while`*.
+-   Конвеєр має бути *відтворюваним*, *стійким до помилок* та *масштабованим*.
+-   Усі файли завантажуються з папки `data/transactions/`.
+
+
+```{=html}
+<hr style="border: 1px solid #ddd; margin: 30px 0 10px 0;">
+<footer style="text-align: center; font-size: 0.9em; color: #666; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; margin-top: 20px;">
+  <p><strong>Виконав(ла): Роменський В'ячеслав Олегович</strong> | Група: <strong>КН-25-1м</strong> | Викладач: Сидоренко В. М.</p>
+  <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2026</p>
+</footer>
+```
