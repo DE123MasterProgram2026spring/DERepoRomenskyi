@@ -1,0 +1,173 @@
+---
+title: "Лабораторна робота №6: Ефективна робота з великими даними за допомогою пакета data.table"
+subtitle: "Інженерія даних | КрНУ ім. М. Остроградського"
+author: "Роменський В'ячеслав"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    sidebar: left
+    collapse-level: 2
+    code-fold: true
+    code-overflow: wrap
+    page-layout: full
+#     include-in-footer:
+#       text: |
+#         <hr>
+#         <footer style="text-align: center; font-size: 0.9em; color: #666;">
+#           <p>Виконав(ла): <strong>Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В.М.</p>
+#           <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+#         </footer>
+# editor: visual
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Мета роботи
+
+Освоїти сучасний інструмент для роботи з великими обсягами даних у R -- пакет `data.table`. Навчитися виконувати *швидкі, пам’ять-ефективні операції* над мільйонами рядків: фільтрацію, агрегацію, оновлення, злиття -- з використанням *унікального синтаксису `DT[i, j, by]`*. Зрозуміти, чому `data.table` є ключовим інструментом інженера даних при роботі з великими даними.
+
+## Варіант 1
+
+### Тема: Аналіз ефективності авіаперевезень за 2014 рік
+
+Ви отримали *один великий файл* `flights14.csv` (253 316 рядків), який містить дані про всі рейси, що вилітали з аеропортів Нью-Йорка у 2014 році (дані з `nycflights14`). Також у вас є *довідник авіакомпаній* `airlines.csv` з повними назвами перевізників.
+
+Ваше завдання -- провести *повний аналіз продуктивності авіакомпаній* виключно за допомогою `data.table`.
+
+### Завдання
+
+#### Етап 1: Завантаження даних
+
+-   Завантажте `flights14.csv` через `fread()`.
+-   Завантажте `airlines.csv` через `fread()`.
+-   Переконайтеся, що обидва об’єкти є `data.table`.
+
+```{r}
+library(data.table)
+
+flights <- fread("data/flights14.csv")
+airlines <- fread("data/airlines.csv")
+
+# перевірка
+is.data.table(flights)
+is.data.table(airlines)
+```
+
+#### Етап 2: Підготовка даних
+
+-   Додайте стовпець `total_delay = dep_delay + arr_delay` *на місці* через `:=`.
+-   Замініть від’ємні значення `total_delay` на 0 (рейс вчасно).
+-   Видаліть стовпці `year`, `month`, `day` *на місці*.
+
+```{r}
+flights[, total_delay := dep_delay + arr_delay]
+flights[total_delay < 0, total_delay := 0]
+flights[, c("year", "month", "day") := NULL]
+```
+
+#### **Етап 3: Агрегація за авіакомпаніями**
+
+-   Обчисліть для кожної авіакомпанії (`carrier`):
+    -   кількість рейсів (`.N`),
+    -   середнє `total_delay`,
+    -   частку рейсів з `total_delay > 60` хв.
+-   Використовуйте `by = carrier`.
+-   Відсортуйте результат за спаданням середнього запізнення через `keyby`.
+
+```{r}
+flights[
+  ,
+  .(
+    flights_count = .N,
+    avg_total_delay = mean(total_delay, na.rm = TRUE),
+    share_long_delays = mean(total_delay > 60, na.rm = TRUE)
+  ),
+  by = carrier
+][order(-avg_total_delay)]
+```
+
+#### **Етап 4: Злиття з довідником**
+
+-   Об’єднайте результат з `airlines` через `on = "carrier"`, щоб додати повну назву авіакомпанії.
+-   Збережіть у змінну `carrier_performance`.
+
+```{r}
+carrier_performance <- merge(
+  flights[
+    ,
+    .(
+      flights_count = .N,
+      avg_total_delay = mean(total_delay, na.rm = TRUE),
+      share_long_delays = mean(total_delay > 60, na.rm = TRUE)
+    ),
+    by = carrier
+  ][order(-avg_total_delay)],
+  airlines,
+  by = "carrier",
+  all.x = TRUE
+)
+
+carrier_performance
+```
+
+#### **Етап 5: Аналіз за аеропортами**
+
+-   Для кожного аеропорту вильоту (`origin`) обчисліть:
+    -   середнє запізнення вильоту (`dep_delay`),
+    -   кількість унікальних авіакомпаній.
+-   Використовуйте `.SD` та `.SDcols`, якщо потрібно.
+
+```{r}
+flights[
+  ,
+  .(
+    avg_dep_delay = mean(dep_delay, na.rm = TRUE),
+    unique_carriers = uniqueN(carrier)
+  ),
+  by = origin
+]
+```
+
+#### **Етап 6: Візуалізація (опціонально)**
+
+-   Перетворіть `carrier_performance` на `data.frame` через `setDF()`.
+-   Побудуйте графік середнього запізнення за авіакомпаніями (через `ggplot2`).
+
+```{r}
+library(ggplot2)
+
+setDF(carrier_performance)
+
+ggplot(carrier_performance,
+       aes(x = reorder(name, avg_total_delay),
+           y = avg_total_delay)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    x = "Airline",
+    y = "Average Total Delay",
+    title = "Performance of Airlines (2014 NYC Flights)"
+  )
+```
+
+### 💡 Технічні вимоги
+
+-   Увесь аналіз має бути виконаний *виключно через `data.table`*.
+-   *Заборонено використовувати `dplyr`, `tidyr`, `%>%`* для маніпуляцій з даними.
+-   Усі файли завантажуються з папки `data/`.
+-   Конвеєр має бути *відтворюваним* та *пам’ять-ефективним*.
+
+```{=html}
+<hr style="border: 1px solid #ddd; margin: 30px 0 10px 0;">
+<footer style="text-align: center; font-size: 0.9em; color: #666; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; margin-top: 20px;">
+  <p><strong>Виконав(ла): Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В. М.</p>
+  <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2026</p>
+</footer>
+```
