@@ -1,0 +1,145 @@
+---
+title: "Лабораторна робота №7: Основи роботи з Apache Spark у середовищі R (через sparklyr)"
+subtitle: "Інженерія даних | КрНУ ім. М. Остроградського"
+author: "Роменський В'ячеслав"
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    sidebar: left
+    collapse-level: 2
+    code-fold: true
+    code-overflow: wrap
+    page-layout: full
+#     include-in-footer:
+#       text: |
+#         <hr>
+#         <footer style="text-align: center; font-size: 0.9em; color: #666;">
+#           <p>Виконав(ла): <strong>Ваше ПІБ</strong> | Група: <strong>Ваша група</strong> | Викладач: Сидоренко В.М.</p>
+#           <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2025</p>
+#         </footer>
+# editor: visual
+editor: visual
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## Мета роботи
+
+Навчитися налаштовувати локальний кластер Apache Spark та виконувати базові операції з великими даними за допомогою R-інтерфейсу `sparklyr`. Освоїти основні етапи роботи з Spark: підключення, завантаження даних, аналіз через `dplyr`-синтаксис, моніторинг через веб-інтерфейс та коректне від’єднання.
+
+## Варіант 1
+
+### Тема: Аналіз даних про рейси з використанням Apache Spark
+
+Ви отримали великий файл `flights_2014.csv` (253 316 рядків), який містить дані про всі рейси, що вилітали з аеропортів Нью-Йорка у 2014 році (дані з `nycflights14`). Ваше завдання -- провести аналіз продуктивності авіакомпаній у *розподіленому середовищі Apache Spark*, використовуючи лише R-інтерфейс `sparklyr`.
+
+### Завдання
+
+#### Етап 1: Встановлення та підключення
+
+-   Встановіть Java 8, пакет `sparklyr` та Spark (версія 3.3.2) через `spark_install()`.\
+-   Підключіться до *локального кластера Spark* через `spark_connect(master = "local")`.
+
+```{r}
+# install.packages("sparklyr")
+
+library(sparklyr)
+
+library(dplyr)
+
+Sys.setenv(SPARK_HOME = "D:\\Projects\\spark-3.3.2-bin-hadoop3")
+
+# Підключення до локального кластера
+sc <- spark_connect(master = "local")
+
+spark_connection_is_open(sc)
+```
+
+#### Етап 2: Завантаження даних
+
+-   Завантажте файл `flights_2014.csv` у Spark через `copy_to()` або `spark_read_csv()`.\
+-   Переконайтеся, що таблиця доступна у Spark (використовуйте `glimpse()` або `count()`).
+
+```{r}
+flights <- spark_read_csv(
+  sc,
+  name = "flights_2014",
+  path = "data/flights_2014.csv",
+  header = TRUE,
+  infer_schema = TRUE
+)
+
+dplyr::glimpse(flights)
+```
+
+#### Етап 3: Аналіз через dplyr-інтерфейс
+
+Виконайте наступні операції *у Spark*, використовуючи синтаксис `dplyr`:\
+- Відфільтруйте рейси з аеропорту *JFK*, де запізнення вильоту (`dep_delay`) \> 60 хв.\
+- Обчисліть *середнє запізнення вильоту* за кожною авіакомпанією (`carrier`).\
+- Відсортуйте результат за спаданням середнього запізнення.\
+- Виберіть *топ-5 авіакомпаній* з найбільшим запізненням.
+
+```{r}
+result_spark <- flights %>%
+  filter(origin == "JFK", dep_delay > 60) %>%
+  group_by(carrier) %>%
+  summarise(avg_dep_delay = mean(dep_delay, na.rm = TRUE)) %>%
+  arrange(desc(avg_dep_delay)) %>%
+  head(5)
+
+result_spark
+```
+
+#### Етап 4: Отримання результатів у R
+
+-   Завантажте результат у R через `collect()`.\
+-   Переконайтеся, що результат -- це `data.frame` з 5 рядками.
+
+```{r}
+result_r <- result_spark %>% collect()
+
+str(result_r)
+```
+
+#### Етап 5: Моніторинг через веб-інтерфейс
+
+-   Відкрийте веб-інтерфейс Spark через `spark_web(sc)`.\
+-   Перевірте:
+    -   чи з’явився ваш датафрейм у вкладці *Storage*\
+    -   чи виконався запит у вкладці *Jobs*\
+    -   скільки пам’яті використовується (вкладка *Executors*).
+    
+```{r}
+spark_web(sc)
+```
+
+#### Етап 6: Від’єднання
+
+-   Коректно від’єднайтеся від кластера через `spark_disconnect(sc)`.
+
+```{r}
+spark_disconnect(sc)
+```
+
+### Технічні вимоги
+
+-   Увесь аналіз має бути виконаний *виключно через `sparklyr`*.\
+-   *Заборонено використовувати `dplyr` без Spark-бекенду* для великих операцій.\
+-   Усі файли завантажуються з папки `data/`.\
+-   Код має бути *відтворюваним* та *пам’ять-ефективним* (не використовуйте `collect()` на повній таблиці!).
+
+
+```{=html}
+<hr style="border: 1px solid #ddd; margin: 30px 0 10px 0;">
+<footer style="text-align: center; font-size: 0.9em; color: #666; padding: 15px; background: #f9f9f9; border-top: 1px solid #eee; margin-top: 20px;">
+  <p><strong>Виконав(ла): Роменський В'ячеслав Олегович</strong> | Група: <strong>КН-25-1м</strong> | Викладач: Сидоренко В.М.</p>
+  <p>Кременчуцький національний університет імені Михайла Остроградського &copy; 2026</p>
+</footer>
+```
